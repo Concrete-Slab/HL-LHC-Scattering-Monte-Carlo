@@ -35,9 +35,9 @@ classdef MCResult
             %MCRESULT Construct an instance of this class
             %   Detailed explanation goes here
             arguments(Input)
-                primaries(9,:) double {mustBeFinite}
-                secondarySamples(1,:) SecondarySamples
-                initial(1,1) MCInput
+                primaries(9,:) double {mustBeFinite} = double.empty(9,0)
+                secondarySamples(1,:) SecondarySamples = SecondarySamples.empty
+                initial(1,1) MCInput = MCInput
                 primaryHistory(1,:) ParticleHistory = ParticleHistory.empty
             end
 
@@ -95,9 +95,10 @@ classdef MCResult
             % directions don't have to be normalised, only relative values matter
             initialDirection = [obj.primaries(5:7,:),obj.secondaries(5:7,:)];
             % indices of particles that will eventually hit tube - not
-            % parallel to z axis
-            primaryParticlesIndex = ~(obj.primaries(5,:)==0 & obj.primaries(6,:)==0);
-            secondaryParticlesIndex = [false(1,length(primaryParticlesIndex)), ~(obj.secondaries(5,:)==0 & obj.secondaries(6,:)==0)];
+            % parallel to z axis, and above minimum kinetic energy
+            mke = Consts.MinimumKineticEnergy;
+            primaryParticlesIndex = ~(obj.primaries(5,:)==0 & obj.primaries(6,:)==0) & (obj.primaries(4,:)-obj.primaries(9,:))>mke;
+            secondaryParticlesIndex = [false(1,length(primaryParticlesIndex)), ~(obj.secondaries(5,:)==0 & obj.secondaries(6,:)==0) & (obj.secondaries(4,:)-obj.secondaries(9,:))>mke];
             % dot product of each position column with itself
             xdotx = dot(initialPos(1:2,:),initialPos(1:2,:));
             % dot product of each position and corresponding direction
@@ -287,7 +288,7 @@ classdef MCResult
             beta = sqrt(1-1./gamma.^2);
             % energy deposition in GeV/m
             dEdx = options.Material.dEdx(beta,obj.projectedParticles(9,:),obj.projectedParticles(8,:));
-
+            
             % total energy deposition
             totE = sum(dEdx);
 
@@ -337,6 +338,65 @@ classdef MCResult
                 fprintf("Energy deposition calculated in %d min %.5f\n",minutes,seconds)
             end
         end
+
+        function [Z,Y,SV] = protonDensity(obj,protonFlux,options)
+            arguments(Input)
+                obj(1,1) MCResult
+                protonFlux(1,1) double % number of protons per second on screen
+                options.Material(1,1) Material = "Cu";
+                options.MaxZPoints(1,:) double {mustBeInteger,mustBeScalarOrEmpty} = []
+                options.MaxThetaPoints(1,:) double {mustBeInteger,mustBeScalarOrEmpty} = []
+                options.echo(1,1) string {mustBeMember(options.echo,["on","off"])} = "on";
+            end
+            arguments(Output)
+                Z(:,:) double % grid, m
+                Y(:,:) double % grid, m
+                SV(:,:) double % grid, GeV/m^3
+            end
+            options.echo = ismember(options.echo,"on");
+            % input parsing
+            if isempty(options.MaxThetaPoints)
+                options.MaxThetaPoints = options.MaxZPoints;
+            end
+
+            % positions of samples on z-theta*R graph
+            zPrim = obj.projectedPrimaries(3,:);
+            zSec = obj.projectedSecondaries(3,:);
+            thetaPrim = sign(obj.projectedPrimaries(2,:)).*acos(obj.projectedPrimaries(1,:)./sqrt(obj.projectedPrimaries(1,:).^2+obj.projectedPrimaries(2,:).^2));
+            thetaSec = sign(obj.projectedSecondaries(2,:)).*acos(obj.projectedSecondaries(1,:)./sqrt(obj.projectedSecondaries(1,:).^2+obj.projectedSecondaries(2,:).^2));
+            yPrim = thetaPrim*Consts.TubeRadius;
+            ySec = thetaSec*Consts.TubeRadius;
+            % store zysamples on the GPU to speed it up for larger samples
+            zySamplesPrim = gpuArray([zPrim;yPrim])';
+            zySamplesSec = gpuArray([zSec;ySec])';
+            % grid initialisation
+            zGridPrim = equiprobableGrid(zPrim,options.MaxZPoints);
+            zGridSec = equiprobableGrid(zSec,options.MaxZPoints);
+            % keep yGrid the same for both primaries and secondaries
+            yGrid = equiprobableGrid(y,options.MaxThetaPoints);
+            
+            [ZPrim,Y] = meshgrid(zGridPrim,yGrid);
+            [ZSec,~] = meshgrid(zGridSec,yGrid);
+            if options.echo
+                % begin performance timer
+                fprintf("Performing kernel energy density estimation onto %d x %d grid\n",size(Z,1),size(Z,2));
+                tic
+            end
+            % KDE grid input (must be nx2), stored on GPU
+            zyGridPrim = gpuArray([ZPrim(:) Y(:)]);
+            zyGridSec = gpuArray([ZSec(:), Y(:)]);
+            % KDE sample input is zySamples from before
+            [PDFPrim,~] = ksdensity(zySamplesPrim,zyGridPrim,'Function','pdf');
+            if ~isempty(zySamplesSec)
+                [PDFSec,~] = ksdensity(zySamplesSec,zyGridSec);
+            else
+                PDFSec = double.empty(size(Y,2),0);
+            end
+            propPrimariesIntersecting = size(obj.projectedPrimaries,2)./size(obj.primaries,2);
+            Z = [ZSec ZPrim];
+            PDF = [PDFSec PDFPrim];
+            SV = PDF.*propPrimariesIntersecting.*protonFlux;
+        end
     end
 end
 
@@ -361,11 +421,16 @@ end
 function [gridVals,gridSteps] = equiprobableGrid(vec,maxK)
 arguments(Input)
     vec(1,:) double % all values of a certain variable
-    maxK(1,:) double {mustBeScalarOrEmpty,mustBeInteger} = []; % maximum number of grid points
+    maxK(1,:) double {mustBeScalarOrEmpty,mustBeInteger,mustBePositive} = []; % maximum number of grid points
 end
 % vector needs to be sorted before starting
 vec = sort(vec);
 n = length(vec);
+if n==0
+    gridVals = [];
+    gridSteps = [];
+    return
+end
 if isempty(maxK)
     k = ceil(min(2*n^(2/5),n/5)); % NIST formula, at least 5 samples per division
 else

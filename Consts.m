@@ -45,6 +45,9 @@ classdef Consts
         MagnetMaterial = "NbTi"
         % LHC beam tube diameter is about 0.025m
         TubeRadius = 0.025;
+        % maximum beam sigma and mu
+        MaxSigma = 240e-6;
+        MaxMu = 0.002;
         % data handle, values are global and variable
         data(1,1) RuntimeData = RuntimeData;
     end

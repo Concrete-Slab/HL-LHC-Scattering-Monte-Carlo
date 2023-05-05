@@ -127,13 +127,10 @@ classdef Ionisation < HardProcess
             % azimuthal angle (phi) is asotropic
             phi = 2*pi*rand;
             dAngles=double([sin(phi);cos(phi);sinTheta;cosTheta]);
-            if any(~isreal(dAngles))
-                dAngles
-            end
             if dE<0
                 secondaryMass = double(me);
                 secondaryCharge = -1;
-                secondaryEnergy = secondaryMass+double(T);
+                secondaryEnergy = double(me+T);
 %                 secondaryMomentumMagnitude = p2e;
 %                 sinSecondaryTheta = -sin(theta)*p2p/p2e;
 %                 cosSecondaryTheta = (initialMomentum-finalMomentum*cosTheta)/secondaryMomentumMagnitude;

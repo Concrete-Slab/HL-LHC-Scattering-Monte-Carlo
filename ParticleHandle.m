@@ -26,10 +26,10 @@ classdef ParticleHandle < handle
     methods % constructor
         function obj = ParticleHandle(energy,charge,mass)
             %PARTICLEHANDLE Constructor
-            arguments
-                energy(1,1) double      % GeV
-                charge(1,1) double      % e
-                mass(1,1) double        % GeV/c^2
+            arguments % defautls to proton @ 7GeV
+                energy(1,1) double = 7000       % GeV
+                charge(1,1) double = 1          % e
+                mass(1,1) double = Consts.mpgev % GeV/c^2
             end
             obj.energy = energy;
             obj.charge = charge;

@@ -19,6 +19,10 @@ classdef RutherfordScattering <HardProcess
         tmin(1,1) double        % GeV^2
         
     end
+
+    properties(Constant,Access=private)
+        hbar = Consts.hbarc/(1e9*Consts.e);
+    end
     
     methods
         function obj = RutherfordScattering(material,geometry,particle)
@@ -50,31 +54,49 @@ classdef RutherfordScattering <HardProcess
                 % integrate K*1/t^2*exp(-0.856e3 *t*R^2) from tmin to
                 % infinity
                 % integral evaluates to statement below
-                tm = obj.tmin;
+%                 tm = obj.tmin;
+                tm = 0.998e-3;
                 a = 0.856e3*obj.Rsquared;
+                
+                a = obj.Rsquared/(6*RutherfordScattering.hbar^2);
                 % integration by parts, second part evaluates to upper
                 % incomplete gamma function
-                st = obj.K*((exp(-a*tm)/tm)-gammainc(0,a*tm,'upper'));
+                st = obj.K*((exp(-a*tm)/tm)-a.*expint(a*tm));
             end
         end
 
         function t = get.tmin(obj)
 %             t = 0.998e-3;
             % change this so it corresponds to minimum scattering angle
-            theta0 = MCS.getTheta0(obj.particle.momentum,obj.particle.beta,obj.particle.charge,obj.Zi,obj.Ai,obj.X0,obj.rho,obj.wt,obj.maxDeltaX);
-            thetaMin = sqrt(2)*erfinv(MCS.F)*theta0;
-            t = (2*obj.particle.momentum*sin(thetaMin/2))^2;
+            pLab = obj.particle.momentum;
+            ELab = obj.particle.energy;
+            theta0 = MCS.getTheta0(pLab,obj.particle.beta,obj.particle.charge,obj.Zi,obj.Ai,obj.X0,obj.rho,obj.wt,obj.maxDeltaX);
+            thetaMin = sym(sqrt(2)*erfinv(MCS.F)*theta0);
+            % thetaMin is in lab frame
+            betaCM = getCOM(pLab,ELab,0,Consts.mpgev*sum(obj.Ai.*obj.wt));
+            labz = double(pLab*cos(thetaMin));
+            laby = double(pLab*sin(thetaMin));
+            % get a momentum vector with thetaMin deviation from z axis
+            fmLab = [ELab;0;laby;labz];
+            % transform momentum to CM frame
+            fmCM = sym(lorentz(fmLab,betaCM));
+            pCM = double(norm(fmCM(2:4)));
+            % calculate theta in the CM frame
+            thetaCM = double(acos(fmCM(4)./norm(fmCM(2:4))));
+            % assigm tmin from thetaMin in CM frame
+            t = (pCM*thetaCM)^2;
         end
         
         function [dE,dAngles,newSecondaryInfo] = interact(obj)
             % sampling procedure
             tm = obj.tmin;
+            tm = 0.998e-3;
             accepted = false;
             while ~accepted
                 z = rand(2,1);
                 t = tm/(1-z(1));
                 % accept t with probability g(t)
-                a = 0.856e3*obj.Rsquared;
+                a = obj.Rsquared/(6*RutherfordScattering.hbar^2);
                 gNormalised = exp(-a*(t-tm));
                 if z(2)<gNormalised
                     accepted = true;

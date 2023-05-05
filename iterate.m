@@ -18,18 +18,19 @@ f = @(t) runSim(M,simopts,t,screenSideLength,offset,pdf,expectedProtons);
 
 
 %[tGuess,Eguess] = solveBisection(f,5e-5,1e-2,1e-6,20);
-str = ["YAGCe"];%,"NaITl","BaF2","CeBr3","Al","Si","Graphite","Cu","Ti"];
+str = ["YAGCe","NaITl","BaF2","CeBr3","Al","Si","Graphite","Cu","Ti"];
 mats = repmat(Material,1,length(str));
 for i = 1:length(mats)
     mats(i) = Material(str(i));
 end
-
+%%
 maxThickness = zeros(1,length(mats));
 deposition = zeros(1,length(mats));
 for i = 1:length(mats)
     fprintf("\nCurrent material: %s (%d/%d)\n",str(i),i,length(mats))
     tMaterial = tic;
-    f = @(t) runSim(mats(i),simopts,t,screenSideLength,offset,pdf,expectedProtons);
+    %% EDIT runSim
+    f = @(t) runSim(mats(i),simopts,t,screenSideLength,offset,pdf,expectedProtons)-4.5;
     [Tguess,Eguess] = solveBisection(f,1e-4,2e-4,1e-6,20);
     maxThickness(i) = Tguess;
     deposition(i) = Eguess;
@@ -46,6 +47,7 @@ mats2 = [mats Material("Chromox")];
 str2 = [str "Chromox"];
 deposition2 = [deposition Eguess];
 maxThickness2 = [maxThickness tGuess];
+%%
 [maxThicknessSorted, I] = sort(maxThickness2);
 depositionSorted = deposition2(I);
 matsSorted = mats2(I);
@@ -58,7 +60,7 @@ b = bar(1:length(strSorted),maxThicknessSorted*1e6);
 ax = gca;
 b.FaceColor='flat';
 b.CData(OTR,:) = repmat([0,0,1],length(find(OTR)),1);
-b.CData(~OTR,:) = repmat([0,0.4,0.6],length(find(~OTR)),1);
+b.CData(~OTR,:) = repmat([0,1,0],length(find(~OTR)),1);
 ylabel("Maximum thickness, \mu{m}")
 yyaxis right
 merit = zeros(1,length(matsSorted));
@@ -78,20 +80,20 @@ xlabel("Material")
 
 
 
-function val = runSim(material,simopts,thickness,sideLength,offset,pdf,expectedProtons)
-    log10nMax = 7;
-    log10nMin = 4;
-    log10tMax = 6;
-    log10tMin = 2;
-    nSamples = ceil(10^((log10nMax-log10nMin)./(log10tMax-log10tMin) * (-log10(thickness)-log10tMin)+log10nMin));
-%     nSamples = ceil(10^(-2/3*log10(thickness)+8/3));
-    scaleFactor = expectedProtons/nSamples;
-    geometry = OffsetRectangle(sideLength,sideLength,offset,thickness,0);
-    geometry.pdf = pdf;
-    samples = geometry.generate(nSamples,"echo","off");
-    in = MCInput(geometry,material,samples=samples);
-    out = mcsimulate(in,simopts,"echo","off");
-    [~,~,E] = out.energyDistribution("MaxThetaPoints",20,"echo","off");
-    E = E.*scaleFactor.*1e-3;
-    val = max(max(E))-4.5;
-end
+% function val = runSim(material,simopts,thickness,sideLength,offset,pdf,expectedProtons)
+%     log10nMax = 7;
+%     log10nMin = 4;
+%     log10tMax = 6;
+%     log10tMin = 2;
+%     nSamples = ceil(10^((log10nMax-log10nMin)./(log10tMax-log10tMin) * (-log10(thickness)-log10tMin)+log10nMin));
+% %     nSamples = ceil(10^(-2/3*log10(thickness)+8/3));
+%     scaleFactor = expectedProtons/nSamples;
+%     geometry = OffsetRectangle(sideLength,sideLength,offset,thickness,0);
+%     geometry.pdf = pdf;
+%     samples = geometry.generate(nSamples,"echo","off");
+%     in = MCInput(geometry,material,samples=samples);
+%     out = mcsimulate(in,simopts,"echo","off");
+%     [~,~,E] = out.energyDistribution("MaxThetaPoints",20,"echo","off");
+%     E = E.*scaleFactor.*1e-3;
+%     val = max(max(E))-4.5;
+% end

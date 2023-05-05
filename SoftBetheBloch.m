@@ -151,7 +151,7 @@ classdef SoftBetheBloch < SoftProcess
                 dPos(2,1) double
             end
             % bethe bloch equation integrated at constant value for delX
-            dE = -delX * obj.dEdx;
+            dE = delX * obj.dEdx;
             dAngle = [0;0];
             dPos = [0;0];
         end

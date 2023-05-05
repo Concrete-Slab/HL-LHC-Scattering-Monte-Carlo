@@ -25,9 +25,11 @@ f = @(x) sqrt(constantVal);
 dy = sum(diff(yLimits));
 dx = sum(diff(xLimits));
 % totProb = constantVal*dx*dy
-% Ihalo = g0*cutoffFactor*Consts.data.Nb./Consts.data.bunchSpacing;
 % expectedProtons = Ihalo*dx*dy*Consts.data.Nb./Consts.data.bunchSpacing;
-Ihalo = constantVal;
-expectedProtons = constantVal*dx*dy*Consts.data.Nb./Consts.data.bunchSpacing;
+Ihalo = g0*cutoffFactor*Consts.data.Nb./Consts.data.bunchSpacing;
+% Ihalo = constantVal*Consts.data.Nb./Consts.data.bunchSpacing;
+
+
+expectedProtons = Ihalo*dx*dy;
 end
 

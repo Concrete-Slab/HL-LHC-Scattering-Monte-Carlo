@@ -66,14 +66,24 @@ direction = pmomentum./norm(pmomentum);
 % GENERATE TRANSFORM TO LOCAL COORDINATES
 T = localTransform(direction);
 hardIndices = 0:nhard;
+nLoops = 0;
 while propagate
+    nLoops = nLoops+1;
+%     if recursionDepth>0
+%         recursionDepth
+%     end
     dEdx = 0;
     for i = 1:nsoft
-        dEdx = dEdx + soft(i).dEdx;
+        dEdx = dEdx - soft(i).dEdx;
     end
+    pRange = particle.energy./dEdx;
+    alphaR = 0.2;
+    finalRange = 1e-3;
+    highRangeMax = alphaR*pRange + finalRange*(1-alphaR)*(2-finalRange./pRange);
+    proposedMax = max(highRangeMax,finalRange);
     % dont allow particle to lose more than 2% of energy.
     % if this step size is too small, then use 1e-7
-    maxStep = min(minimumMaximumStepLength,0.02*particle.energy./dEdx);
+    maxStep = min(minimumMaximumStepLength,proposedMax);
     hardInteraction = false;
     
     
@@ -108,9 +118,16 @@ while propagate
     else
         deltaX = maxStep;
     end
+    if deltaX<0
+        deltaX
+    end
+    
     
     % prepare to move by delX
     projectedPosition = ppos + deltaX*direction;
+    if ~isreal(projectedPosition(2))
+        ppos
+    end
     % if delX is too large, then bring to edge, cease propagation and do
     % not apply a hard interaction, as the particle never reaches
     % interaction point
@@ -140,7 +157,7 @@ while propagate
         propagate = false;
         particle.momentum = 0;
     else
-        particle.energy = particle.energy-dE;
+        particle.energy = particle.energy+dE;
     end
 
     % move the particle - intermediate diagram
@@ -202,25 +219,46 @@ while propagate
         newDirection = T*[dAngleHard(2)*dAngleHard(3);dAngleHard(1)*dAngleHard(3);dAngleHard(4)];
         direction = newDirection./norm(newDirection);
         T = localTransform(direction);
-        if ~isempty(newSecondaryInfo) && recursionDepth<maxRecursion && secondaryIndex<sizeAtCurrentDepth
+        if ~isempty(newSecondaryInfo) && recursionDepth<maxRecursion && secondaryIndex<=sizeAtCurrentDepth
             % follow the secondary with recursion
             newSecondaryInfo(2:4) = T*newSecondaryInfo(2:4);
             [initSecondary,additionalSecondaries,initHistory,additionalHistories] = simulateOne([ppos;newSecondaryInfo],hard,soft,geometry,savesPositions,recursionDepth+1,maxRecursion,maxSecondariesPerRecursion);
             
+            if ~savesPositions
+                % secondaries need at least 2 history points so
+                % they can be followed. initHistory will be empty
+                % because it is treated as the primary particle
+                initHistory = ParticleHistory(2);
+                initHistory = initHistory.write([ppos,initSecondary(1:3)]);
+            end
+
             % do we have enough room to store all the new secondaries?
             nSecondaries = length(additionalHistories)+1;
-            nextSecondaryIndex = secondaryIndex+nSecondaries-1;
-            if nextSecondaryIndex<=sizeAtCurrentDepth
+            if secondaryIndex+nSecondaries-1<=sizeAtCurrentDepth
+                % if enough memory, save all secondaries
+                nextSecondaryIndex = secondaryIndex+nSecondaries-1;
                 secondaries(:,secondaryIndex:nextSecondaryIndex) = [initSecondary,additionalSecondaries];
-                if ~savesPositions
-                    % secondaries need at least 2 history points so
-                    % they can be followed. initHistory will be empty
-                    % because it is treated as the primary particle
-                    initHistory = ParticleHistory(2);
-                    initHistory = initHistory.write([ppos,initSecondary(1:3)]);
-                end
                 secondaryHistory(:,secondaryIndex:nextSecondaryIndex) = [initHistory,additionalHistories];
+            else
+                % if not, save only the initial secondary
+                nextSecondaryIndex = secondaryIndex;
+                secondaries(:,secondaryIndex) = initSecondary;
+                secondaryHistory(:,secondaryIndex) = initHistory;
             end
+
+%             if nextSecondaryIndex<=sizeAtCurrentDepth
+%                 secondaries(:,secondaryIndex:nextSecondaryIndex) = [initSecondary,additionalSecondaries];
+%                 if ~savesPositions
+%                     % secondaries need at least 2 history points so
+%                     % they can be followed. initHistory will be empty
+%                     % because it is treated as the primary particle
+%                     initHistory = ParticleHistory(2);
+%                     initHistory = initHistory.write([ppos,initSecondary(1:3)]);
+%                 end
+%                 secondaryHistory(:,secondaryIndex:nextSecondaryIndex) = [initHistory,additionalHistories];
+%             end
+
+            % increment the current secondary index
             secondaryIndex = nextSecondaryIndex+1;
         end
     end

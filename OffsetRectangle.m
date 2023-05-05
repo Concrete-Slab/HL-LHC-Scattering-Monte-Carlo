@@ -8,6 +8,12 @@ classdef OffsetRectangle < Geometry
         offset
     end
 
+    properties(Constant)
+        defaultWidth = 0.01;
+        defaultHeight = 0.01;
+        defaultOffset = Consts.MaxSigma*4.8+Consts.MaxMu;
+    end
+
     methods
         function obj = OffsetRectangle(width,height,offset,thickness,xRotation)
             %OFFSETRECTANGLE Construct an instance of this class

@@ -1,8 +1,8 @@
 %% Define geometry
-nSamples = 1e1;
-sigma = 7.1e-6;
+nSamples = 1e5;
+sigma = 220e-6;
 thickness = 1e-2;
-mu = 300e-6;
+mu = 0.002;
 
 haloLimit = 4.8*sigma;
 offset = haloLimit+mu;
@@ -19,8 +19,9 @@ runtimeData.default;
 geometry = OffsetRectangle(0.01,0.01,offset,thickness);
 geometry.xRotation = 0;
 [pdf,Ihalo,expectedProtons] = constantHalo(0,sigma,1e-5,geometry.xLimits,geometry.yLimits);
-
-geometry.pdf = pdf;
+% f = normalDistribution(0,220);
+% expectedProtons = 1/(sigma^2*2*pi)*exp(-0.5*offset^2./sigma^2)*Consts.data.Nb/Consts.data.bunchSpacing*30e-6*0.01;
+% geometry.pdf = pdf;
 % scale factor = expected incident protons per second/simulated protons
 scaleFactor = expectedProtons/nSamples;
 
@@ -33,8 +34,8 @@ samples = geometry.generate(nSamples);
 mcinput = MCInput(geometry,material,samples=samples);
 % make simulation options object
 %%
-simopts = SimulationOptions(exclude="all",threads=8,savesPositions=true,recursionLimit=2);
-simopts.include("Bethe","Ionisation","Rutherford")
+simopts = SimulationOptions(exclude="all",threads=8,savesPositions=false,recursionLimit=2);
+simopts.include("Ionisation","Nuclear")
 % mcinput.view
 % hold on
 % plot(0,0,"k.")

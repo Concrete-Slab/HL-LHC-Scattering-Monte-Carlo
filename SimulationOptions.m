@@ -9,7 +9,7 @@ classdef SimulationOptions < handle
     properties(Constant)
 %         allowedModels(1,4) string = ["MCS","Rutherford","Photoionisation","Bethe"]
         softModels(1,:) string = ["MCS","Bethe"]
-        hardModels(1,:) string = ["Rutherford","Ionisation"]
+        hardModels(1,:) string = ["Rutherford","Ionisation","Nuclear"]
         allowedModels(1,:) string = [SimulationOptions.softModels,SimulationOptions.hardModels]
     end
 
@@ -46,13 +46,17 @@ classdef SimulationOptions < handle
             %   Detailed explanation goes here
             arguments
                 options.exclude(1,:) string {SimulationOptions.mustBeModel} = [];
-                options.threads(1,1) double {mustBeInteger,mustBePositive,mustBeLessThanOrEqual(options.threads,8)} = 1
-                options.savesPositions(1,1) logical = true
+                options.threads(1,1) double {mustBeInteger,mustBePositive,mustBeLessThanOrEqual(options.threads,8)} = 8
+                options.savesPositions(1,1) logical = false
                 options.recursionLimit(1,1) double {mustBeInteger,mustBeNonnegative} = 0;
                 options.poissonPercentile(1,1) double {mustBeNonnegative,mustBeLessThan(options.poissonPercentile,1)} = SimulationOptions.defaultPoissonPercentile;
                 options.maximumSecondaries(1,1) double {mustBeNonnegative,mustBeInteger} = SimulationOptions.defaultMaximumSecondaries;
             end
-            obj.exclude(options.exclude);
+            if isempty(options.exclude)
+                obj.include("all")
+            else
+                obj.exclude(options.exclude);
+            end
             obj.threads = options.threads;
             obj.savesPositions = options.savesPositions;
             obj.recursionLimit = options.recursionLimit;
@@ -147,7 +151,7 @@ classdef SimulationOptions < handle
             for isoft = length(softStr):-1:1
                 softsim(isoft) = getSoft(softStr(isoft),mcinput);
             end
-            for ihard = length(softStr):-1:1
+            for ihard = length(hardStr):-1:1
                 hardsim(ihard) = getHard(hardStr(ihard),mcinput);
             end
         end
@@ -196,6 +200,7 @@ classdef SimulationOptions < handle
             mustBeMember(model,[SimulationOptions.allModels,'all','hard','soft'])
         end
     end
+
 end
 
 function sp = getSoft(strp,inp)
@@ -236,6 +241,8 @@ switch strp
         hp = Ionisation(inp.material);
     case "Rutherford"
         hp = RutherfordScattering(inp.material,inp.geometry);
+    case "Nuclear"
+        hp = NuclearProcess(inp.material);
     otherwise
         warning("Couldnt find hard model %s, returning empty",strp)
         hp = HardProcess.empty(1,0);

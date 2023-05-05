@@ -62,7 +62,7 @@ classdef Geometry < handle & matlab.mixin.Heterogeneous
 
             arguments(Input)
                 obj(1,1) Geometry
-                n(1,1) double {mustBePositive,mustBeInteger}
+                n(1,1) double {mustBeNonnegative,mustBeInteger}
                 options.type(1,1) char {mustBeMember(options.type,{'p','e'})} = 'p'
                 options.echo(1,1) string {mustBeMember(options.echo,["on","off"])} = "on"
             end

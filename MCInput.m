@@ -4,8 +4,8 @@ classdef MCInput
     
     properties
         samples(9,:) double
-        geometry(1,1) Geometry = SymRectangles;
-        material(1,1) Material
+        geometry(1,1) Geometry = OffsetRectangle;
+        material(1,1) Material = Material
     end
 
     properties(Dependent,SetAccess=private)
@@ -17,21 +17,22 @@ classdef MCInput
             %MCIN Construct an instance of this class
             %   Detailed explanation goes here
             arguments
-                geometry(1,1) Geometry
-                material(1,1) Material
+                geometry(1,1) Geometry = OffsetRectangle
+                material(1,1) Material = Material
                 options.n(1,1) double {mustBeInteger,mustBePositive}
                 options.samples(9,:) double 
+                options.echo(1,1) string {mustBeMember(options.echo,["off","on"])} = "off";
             end
             if (isfield(options,'samples'))
                 obj.samples = options.samples;
             else
                 if ~isfield(options,'n')
-                    n = 100;
+                    n = 0;
                 else
                     n = options.n;
                 end
-                warning("Generating %d samples, expect performance loss",n);
-                samps = geometry.generate(n);
+%                 warning("Generating %d samples, expect performance loss",n);
+                samps = geometry.generate(n,"echo",options.echo);
                 obj.samples = samps;
             end
             obj.geometry = geometry;
