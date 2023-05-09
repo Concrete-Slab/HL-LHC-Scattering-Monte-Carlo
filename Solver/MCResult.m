@@ -357,7 +357,7 @@ classdef MCResult
                     fprintf("Calculating secondary ranges...")
                 end
                 % need to first filter out the secondaries without range
-                [~,secondaryRanges] = obj.getRange(options.ShieldingMaterial,"include","secondaries");
+                [~,secondaryRanges] = obj.getRange(options.ShieldingMaterial,"include","secondaries","method","Perpendicular");
                 includeIdx = secondaryRanges>options.ShieldingDepth;
                 includedSecondaries = obj.projectedSecondaries(:,includeIdx);
 %                 includedSecondaries = obj.projectedSecondaries;
@@ -686,9 +686,13 @@ classdef MCResult
                 obj(1,1) MCResult
                 material(1,1) Material = "W"
                 options.include(1,1) string {mustBeMember(options.include,["primaries","secondaries","all"])} = "all"
+                options.method(1,1) string {mustBeMember(options.method,["True","Perpendicular"])} = "Perpendicular"
             end
             [primaryRange,secondaryRange] = obj.getCSDARange(material,include=options.include);
             % mean angle follows rayleigh distribution with theta_0
+
+            
+            
             Z = material.Z;
             A = material.A;
             wt = material.wt;
@@ -705,9 +709,22 @@ classdef MCResult
             secondaryBeta = sqrt(1-1./(obj.projectedSecondaries(4,:)./obj.projectedSecondaries(9,:)).^2);
             secondaryMomentum = obj.projectedSecondaries(4,:).*secondaryBeta;
             secondaryCharge = obj.projectedSecondaries(8,:);
-            for i = 1:length(secondaryRange)
+            parfor i = 1:length(secondaryRange)
                 secondaryTheta = sym(sqrt(pi/2) * MCS.getTheta0(secondaryMomentum(i),secondaryBeta(i),secondaryCharge(i),Z,A,X0,rho,wt,secondaryRange(i)));
                 secondaryRange(i) = double(2*sym(secondaryRange(i))./(1+1/cos(secondaryTheta)));
+            end
+
+            if options.method=="Perpendicular"
+                if options.include == "primaries"||options.include=="all"
+                    primaryDirections = sym(obj.projectedPrimaries(5:7,:));
+                    primarySines = double(sin(acos(primaryDirections(3,:)./sqrt(primaryDirections(3,:).^2+primaryDirections(2,:).^2+primaryDirections(1,:).^2))));
+                    primaryRange = primaryRange.*abs(primarySines);
+                end
+                if options.include=="secondaries"||options.include=="all"
+                    secondaryDirections = sym(obj.projectedSecondaries(5:7,:));
+                    secondarySines = double(sin(acos(secondaryDirections(3,:)./sqrt(secondaryDirections(3,:).^2+secondaryDirections(2,:).^2+secondaryDirections(1,:).^2))));
+                    secondaryRange = secondaryRange.*secondarySines;
+                end
             end
         end
     end

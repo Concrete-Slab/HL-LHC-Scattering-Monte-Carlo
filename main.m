@@ -1,4 +1,6 @@
 Consts.data.default
+% IMPORTANT - add subdirectories to MATLAB search path with below command
+addpath(genpath(pwd))
 %% Define problem geometry
 nSamples = 1e2; % number of protons that will be simulated
 
@@ -42,7 +44,7 @@ simopts = SimulationOptions(exclude="all",threads=8,savesPositions=false,recursi
 
 % choose which physical processes to model
 % The list of supported models is given by SimulationOptions.allowedModels 
-simopts.include("Ionisation","Bremsstrahlung")
+simopts.include("Ionisation","Bremsstrahlung","Nuclear","Bethe","MCS","Rutherford")
 %% Run simulation
 mcout = mcsimulate(mcinput,simopts);
 %% Inspect results
@@ -72,5 +74,5 @@ mcout.viewIntersections("scalefactor",scaleFactor,"MaxThetaPoints",20,"kmeans",2
 % view the ranges of scattered particles in tungsten (W)
 % - secondary ranges are of most interest, save time by excluding primaries
 % - range estimation options are "CSDA", "True", or "Perpendicular"
-mcout.viewCSDARange("W","include","secondaries","method","Perpendicular")
+mcout.viewCSDARange("W","method","Perpendicular")
 
