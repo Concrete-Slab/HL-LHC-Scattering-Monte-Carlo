@@ -79,6 +79,7 @@ classdef NuclearProcess < HardProcess
                 case 3
                     % proton-nucleon single diffractive scattering
                     [dE,dAngle] = samplepnSD(obj);
+                    
                     return
                 case 4
                     t = samplepNElastic(obj);
@@ -106,7 +107,7 @@ classdef NuclearProcess < HardProcess
         end
     end
 
-    methods % getters, private
+    methods % getters, individual cross-sections
         function sppel = get.sigmapnElastic(obj)
             p = obj.particle.momentum;
             sppel = obj.neff*7.0e-31*(p/450)^(4.79e-2); % barn
@@ -114,7 +115,6 @@ classdef NuclearProcess < HardProcess
 
         function sppsd = get.sigmapnSD(obj)
             sppsd = obj.neff*0.68e-31*log(0.15*2*Consts.mpgev*obj.particle.momentum); % barn
-
         end
 
         function spptot = get.sigmapnTotal(obj)
@@ -131,7 +131,6 @@ classdef NuclearProcess < HardProcess
         function spNel = get.sigmapNElastic(obj)
             % elastic pN sigma is total minus every other sigma
             spNel = obj.sigmapNTotal-obj.sigmapNInelastic-obj.sigmapnTotal;
-
         end
 
         function spNinel = get.sigmapNInelastic(obj)
@@ -208,14 +207,14 @@ classdef NuclearProcess < HardProcess
             % random azimuth, doesnt change with z lorentz boost
             phi = rand*2*pi;
             % perform inverse lorentz boost back to lab frame
-            fMomentumVecCM = pfCM.*[cos(phi)*sinThetaCM;sin(phi*sinThetaCM);cosThetaCM];
+            fMomentumVecCM = pfCM.*[cos(phi)*sinThetaCM;sin(phi)*sinThetaCM;cosThetaCM];
             fmfCM = [sqrt(pfCM^2+Consts.mpgev^2);fMomentumVecCM];
             betaCM = getCOM(obj.particle.momentum,EiLab,0,Consts.mpgev);
             fmfLab = sym(inverselorentz(double(fmfCM),betaCM));
             % obtain final results
             cosThetaLab = fmfLab(4)./norm(fmfLab(2:4));
             sinThetaLab = sin(acos(cosThetaLab));
-            dE = double(EiLab-fmfLab(1));
+            dE = double(fmfLab(1)-EiLab);
             dAngles = double([sin(phi);cos(phi);sinThetaLab;cosThetaLab]);
         end
 

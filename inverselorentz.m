@@ -9,6 +9,6 @@ arguments(Output)
     P1(4,1) double          % Four-momentum in initial frame (GeV/c)
 end
     gammaFrame = 1/sqrt(1-betaFrame^2);
-    T = [gammaFrame 0 0 -gammaFrame; 0 1 0 0; 0 0 1 0; -gammaFrame*betaFrame 0 0 gammaFrame];
-    P1 = T\P2;
+    Tinv = [gammaFrame 0 0 gammaFrame*betaFrame; 0 1 0 0; 0 0 1 0; gammaFrame*betaFrame 0 0 gammaFrame];
+    P1 = Tinv*P2;
 end

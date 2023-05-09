@@ -119,7 +119,7 @@ classdef MCS < SoftProcess
         function zNormal = sampleCentralF(theta0,n)
             %TODO implement this function
             z = rand(1,n);
-            thetaStandard = sqrt(2)*erfinv(F*(2*z-1));
+            thetaStandard = sqrt(2)*erfinv(MCS.F*(2*z-1));
             % scale by the standard deviation
             zNormal = theta0*thetaStandard;
         end

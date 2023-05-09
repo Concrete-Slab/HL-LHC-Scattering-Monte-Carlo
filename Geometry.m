@@ -8,6 +8,7 @@ classdef Geometry < handle & matlab.mixin.Heterogeneous
         integratedProbability(1,:) double {mustBeNonnegative,mustBeScalarOrEmpty}
         zvMin(1,:) double                               % z positions of upstream vertices
         zvMax(1,:) double                               % z positions of downstream vertices
+        area(1,1) double                                % frontal area of screen
         precision(1,1) double {mustBeInteger,mustBePositive} = 16 % maximum number of decimal places to round to
     end
 
@@ -53,13 +54,24 @@ classdef Geometry < handle & matlab.mixin.Heterogeneous
             obj.yv = yv;
             obj.thickness = thickness;
             obj.xRotation = xRotation;
+            
 
+            % calculate frontal area from vertices - shoelace formula
+            nVertices = length(xv)-1;
+            obj.area = 1/2 * abs(sum((yv(1:nVertices)+yv(2:nVertices+1)).*(xv(1:nVertices)-xv(2:nVertices+1))));
+
+            
         end
     end
 
     methods % public, simulation
         function samples = generate(obj,n,options)
-
+            % SAMPLES
+            % Samples are stored as column vectors of length 8
+            % entries 1-3 store 3d position
+            % entries 4-7 store 3d four momentum  in natural units GeV/c
+            % entry 8 stores particle charge
+            % entry 9 stores rest mass in natural units GeV/c^2 for numerical accuracy
             arguments(Input)
                 obj(1,1) Geometry
                 n(1,1) double {mustBeNonnegative,mustBeInteger}

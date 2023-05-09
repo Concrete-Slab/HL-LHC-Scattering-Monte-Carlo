@@ -16,7 +16,6 @@ arguments(Output)
     secondaryHistory(1,:) ParticleHistory
 end
 % initialise primary particle's properties
-mke = Consts.MinimumKineticEnergy;
 pfm = initialSample(4:7);
 penergy = pfm(1);
 pmomentum = pfm(2:4);
@@ -26,6 +25,8 @@ pmass = initialSample(9);
 minimumMaximumStepLength = geometry.thickness + eps;
 % set up a particle handle so that models can all listen to updates
 particle = ParticleHandle(penergy,pcharge,pmass);
+% determine minimum kinetic energy based on particle
+mke = Consts.MinimumKineticEnergy(particle.mass,particle.charge);
 
 if savesPositions
     % set up a particle history object to track the primary particle

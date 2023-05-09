@@ -37,9 +37,7 @@ classdef Consts
 
         % Bethe-Bloch constant K (GeV kmol^-1 m^2)
         Kbb = 4*pi*Consts.Na*Consts.re^2*Consts.megev
-        % minimum kinetic energy to propagate a particle, GeV
-        MinimumKineticEnergy = 1e-7; % (1e-7 GeV = 100eV)
-
+        
         % LHC Constants
         % LHC magnet material
         MagnetMaterial = "NbTi"
@@ -48,10 +46,34 @@ classdef Consts
         % maximum beam sigma and mu
         MaxSigma = 240e-6;
         MaxMu = 0.002;
+        TungstenDepth = 0.016;
         % data handle, values are global and variable
         data(1,1) RuntimeData = RuntimeData;
     end
 
-    
+    properties(Constant,Access=private)
+        % minimum kinetic energies for protons and electrons
+        MKEElectron = 1e-3; % (25e-6 GeV = 1MeV) limit of D.Tan relation
+        MKEProton = 10e-6; % (10e-6 GeV = 10keV) from geant4 suggestion
+    end
+
+    methods(Static)
+        % minimum kinetic energy to propagate a particle, GeV
+        function mke = MinimumKineticEnergy(mass,charge)
+            arguments
+                mass(1,:) double
+                charge(1,:) double 
+            end
+            protonIdx = and(mass==Consts.mpgev,charge==1);
+            electronIdx = and(mass == Consts.megev,charge ==-1);
+            mke = zeros(1,length(mass));
+            mke(protonIdx) = Consts.MKEProton;
+            mke(electronIdx) = Consts.MKEElectron;
+            if any(mke==0)
+                warning("Unrecognised particle")
+            end
+            
+        end
+    end
 end
 

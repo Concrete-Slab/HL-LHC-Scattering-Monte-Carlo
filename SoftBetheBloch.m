@@ -11,6 +11,7 @@ classdef SoftBetheBloch < SoftProcess
         Tcut(1,1) double            % minimum energy transfer MeV
         nel(1,1) double             % number density of electrons, m^-3
         isConductor(1,1) logical    % is material a conductor
+        radiationLength(1,1) double % radiation length, kg m^-2
     end
 
     properties(SetAccess=private,Dependent)
@@ -64,6 +65,7 @@ classdef SoftBetheBloch < SoftProcess
             end
             obj.Tcut = Tcut; % MeV
             obj.nel = Consts.Na*sum(material.wt.*material.Z./material.A)*material.rho; % m^-3
+            obj.radiationLength = material.X0;
         end
 
     end
@@ -84,6 +86,8 @@ classdef SoftBetheBloch < SoftProcess
                 fterm = F(tau,tauUp);
                 logterm = log((2*(gamma+1))/(obj.I/me)^2);
                 e = -2*pi*Consts.re^2*Consts.megev*obj.nel/beta^2 * (logterm + fterm - obj.delta);
+                % add brehmstrahlung term
+%                 e = e - obj.particle.kineticEnergy./obj.radiationLength;
             elseif obj.particle.mass == Consts.mpgev && obj.particle.charge == 1
                 % proton, use corrected bethe bloch formula for T<Tcut
                 gamma = obj.particle.gamma;
@@ -97,6 +101,7 @@ classdef SoftBetheBloch < SoftProcess
                 e = 0;
             end
         end
+        
         function tmax = get.Tmax(obj)
             if obj.particle.charge ==-1 && obj.particle.mass==Consts.megev
                 % electron

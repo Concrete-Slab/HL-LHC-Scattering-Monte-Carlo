@@ -1,24 +1,18 @@
 %% SETUP
-sigma = 7.1e-6;
-mu = 300e-6;
-
-haloLimit = 4.8*sigma;
-offset = haloLimit+mu;
+sigma = 80e-6;
+mu = 0.002;
+nSamples = 1e6;
+t10 = 1e-2;
+t00 = 1e-5;
+maxIterations = 25;
+abstol = 2.5e-6;
 screenSideLength = 0.01;
-xLimits = [offset;offset + screenSideLength];
-yLimits = [-screenSideLength/2;screenSideLength/2];
-runtimeData = Consts.data;
-runtimeData.default;
-M = Material("Chromox");
-[pdf,Ihalo,expectedProtons] = constantHalo(mu,sigma,1e-5,xLimits,yLimits);
-simopts = SimulationOptions(exclude="all",threads=8,savesPositions=false,recursionLimit=2);
-simopts.include("MCS","Bethe","Ionisation","Rutherford")
+simopts = SimulationOptions(exclude="all",threads=8,savesPositions=false,recursionLimit=0);
+simopts.include("Nuclear","MCS","Ionisation","Bethe","Rutherford")
+kmeans = 2;
+scaleFactor = Consts.data.Nb./Consts.data.bunchSpacing * 10^-5/(2*pi*sigma^2) * screenSideLength^2 * 1e-3/nSamples;
 %% RUN SOLVER
-f = @(t) runSim(M,simopts,t,screenSideLength,offset,pdf,expectedProtons);
-
-
-%[tGuess,Eguess] = solveBisection(f,5e-5,1e-2,1e-6,20);
-str = ["YAGCe","NaITl","BaF2","CeBr3","Al","Si","Graphite","Cu","Ti"];
+str = ["YAPCe","LSOCe"];
 mats = repmat(Material,1,length(str));
 for i = 1:length(mats)
     mats(i) = Material(str(i));
@@ -27,31 +21,58 @@ end
 maxThickness = zeros(1,length(mats));
 deposition = zeros(1,length(mats));
 for i = 1:length(mats)
+
     fprintf("\nCurrent material: %s (%d/%d)\n",str(i),i,length(mats))
     tMaterial = tic;
-    %% EDIT runSim
-    f = @(t) runSim(mats(i),simopts,t,screenSideLength,offset,pdf,expectedProtons)-4.5;
-    [Tguess,Eguess] = solveBisection(f,1e-4,2e-4,1e-6,20);
-    maxThickness(i) = Tguess;
-    deposition(i) = Eguess;
+    t1 = t10;
+    ft1 = 1;
+    t0 = t00;
+    ft0 = -1;
+    if ft0*ft1>0
+        error("Both guesses have same sign")
+    end
+    j=0;
+    
+    while j<=maxIterations
+        j = j+1;
+        t2 = 10^((log10(t1)+log10(t0))/2);
+        if abs(t0-t2)<abstol
+            break
+        end
+        tStart = tic;
+            g = OffsetRectangle(screenSideLength,screenSideLength,4.8*sigma+mu,t2);
+            out = mcsimulate(MCInput(g,mats(i),"n",nSamples,"echo","off"),simopts,echo="off");
+            ft2 = scaleFactor*out.maxEnergy("kmeans",kmeans,"MaxThetaPoints",20,"echo","off") - 4;
+        tStop = toc(tStart);
+        seconds = rem(tStop,60);
+        minutes = (tStop-seconds)./60;
+        fprintf(" - Guess %d is %.1f microns. Sim time was %d min, %.5fs\n",j,t2*1e6,minutes,seconds)
+        if ft2*ft0>0
+            % new value lies between t2 and t1
+            t0 = t2;
+            ft0 = ft2;
+        else
+            t1 = t2;
+        end
+    end
+    
+
+
+
     elapsedTime = toc(tMaterial);
     seconds = rem(elapsedTime,60);
     minutes = (elapsedTime-seconds)./60;
-    fprintf("Finished calculation for %s, took %d mins %.5f seconds\n",str(i),minutes,seconds)
+    fprintf("Finished calculation for %s, took %d mins %.5f seconds. Thickness is %.1f microns\n",str(i),minutes,seconds,t2*1e6)
+    maxThickness(i) = t2;
+    deposition(i) = ft2 + 4;
 end
-
-
+% save MaxThicknesses mats str maxThickness deposition
+save ExtraThicknesses mats str maxThickness deposition
 %%
-load chromomxThickness.mat
-mats2 = [mats Material("Chromox")];
-str2 = [str "Chromox"];
-deposition2 = [deposition Eguess];
-maxThickness2 = [maxThickness tGuess];
-%%
-[maxThicknessSorted, I] = sort(maxThickness2);
-depositionSorted = deposition2(I);
-matsSorted = mats2(I);
-strSorted = str2(I);
+[maxThicknessSorted, I] = sort(maxThickness);
+depositionSorted = deposition(I);
+matsSorted = mats(I);
+strSorted = str(I);
 OTR = ismember(strSorted,["Al","Ti","Si","Graphite","Cu"]);
 
 hold on

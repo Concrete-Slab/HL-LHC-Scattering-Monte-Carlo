@@ -1,9 +1,13 @@
 classdef Bremsstrahlung < SoftProcess
-    %BREMSSTRAHLUNG Summary of this class goes here
-    %   Detailed explanation goes here
+    %BREMSSTRAHLUNG
+    %   Continuous radiative energy loss by electrons
     
-    properties
+    properties(SetAccess=private)
         X0
+    end
+
+    properties(Dependent,SetAccess=protected)
+        dEdx
     end
     
     methods
@@ -11,16 +15,29 @@ classdef Bremsstrahlung < SoftProcess
             %BREMSSTRAHLUNG Construct an instance of this class
             %   Detailed explanation goes here
             arguments
-                material(1,1) Material
+                material(1,1) Material = "Chromox"
                 particle(1,:) ParticleHandle {mustBeScalarOrEmpty} = ParticleHandle.empty
             end
             obj.X0 = material.X0;
+            obj.particle = particle;
         end
         
-        function outputArg = method1(obj,inputArg)
-            %METHOD1 Summary of this method goes here
-            %   Detailed explanation goes here
-            outputArg = obj.X0 + inputArg;
+        function [dE,dAngles,dPos] = update(obj,delX)
+            %UPDATE Apply an energy change due to brehmsstrahlung
+            % only apply update to electrons
+            if obj.particle.charge == -1 && obj.particle.mass == Consts.megev
+                dE = obj.dEdx * delX;
+            else
+                dE = 0;
+            end
+            dAngles = 0;
+            dPos = 0;
+        end
+    end
+
+    methods % getters
+        function e = get.dEdx(obj)
+            e = -1 * obj.particle.energy/obj.X0;
         end
     end
 end

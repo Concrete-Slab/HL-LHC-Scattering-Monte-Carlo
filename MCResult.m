@@ -96,9 +96,10 @@ classdef MCResult
             initialDirection = [obj.primaries(5:7,:),obj.secondaries(5:7,:)];
             % indices of particles that will eventually hit tube - not
             % parallel to z axis, and above minimum kinetic energy
-            mke = Consts.MinimumKineticEnergy;
-            primaryParticlesIndex = ~(obj.primaries(5,:)==0 & obj.primaries(6,:)==0) & (obj.primaries(4,:)-obj.primaries(9,:))>mke;
-            secondaryParticlesIndex = [false(1,length(primaryParticlesIndex)), ~(obj.secondaries(5,:)==0 & obj.secondaries(6,:)==0) & (obj.secondaries(4,:)-obj.secondaries(9,:))>mke];
+            mkePrimary = Consts.MinimumKineticEnergy(obj.primaries(9,:),obj.primaries(8,:));
+            mkeSecondary = Consts.MinimumKineticEnergy(obj.secondaries(9,:),obj.secondaries(8,:));
+            primaryParticlesIndex = ~(obj.primaries(5,:)==0 & obj.primaries(6,:)==0) & (obj.primaries(4,:)-obj.primaries(9,:))>mkePrimary;
+            secondaryParticlesIndex = [false(1,length(primaryParticlesIndex)), ~(obj.secondaries(5,:)==0 & obj.secondaries(6,:)==0) & (obj.secondaries(4,:)-obj.secondaries(9,:))>mkeSecondary];
             % dot product of each position column with itself
             xdotx = dot(initialPos(1:2,:),initialPos(1:2,:));
             % dot product of each position and corresponding direction
@@ -112,9 +113,9 @@ classdef MCResult
             % remove particles that never reach z axis
             obj.projectedPrimaries = projectedParticles(:,primaryParticlesIndex);
             obj.projectedSecondaries = projectedParticles(:,secondaryParticlesIndex);
-%             obj.projectedParticles = obj.projectedParticles(:,projectedParticlesIndex);
-            
-%             obj.projectedParticles = obj.projectedParticles(:,isreal(obj.projectedParticles));
+            %             obj.projectedParticles = obj.projectedParticles(:,projectedParticlesIndex);
+
+            %             obj.projectedParticles = obj.projectedParticles(:,isreal(obj.projectedParticles));
         end
     end
 
@@ -143,13 +144,13 @@ classdef MCResult
         function pp = get.projectedParticles(obj)
             pp = [obj.projectedPrimaries,obj.projectedSecondaries];
         end
-%         function pp = get.projectedPrimaries(obj)
-%             I = find(~(obj.primaries(5,:)==0 & obj.primaries(6,:)==0));
-%             pp = obj.projectedParticles(:,1:size(obj.primaries(:,I),2));
-%         end
-%         function ps = get.projectedSecondaries(obj)
-%             ps = obj.projectedParticles(:,(size(obj.primaries,2)+1):end);
-%         end
+        %         function pp = get.projectedPrimaries(obj)
+        %             I = find(~(obj.primaries(5,:)==0 & obj.primaries(6,:)==0));
+        %             pp = obj.projectedParticles(:,1:size(obj.primaries(:,I),2));
+        %         end
+        %         function ps = get.projectedSecondaries(obj)
+        %             ps = obj.projectedParticles(:,(size(obj.primaries,2)+1):end);
+        %         end
     end
 
     methods % public, visualisation
@@ -206,19 +207,19 @@ classdef MCResult
             dSample = obj.mcinput.samples-obj.primaries;
             viewChangesDisplayStyle = 'r.';
             figure
-            tiledlayout(3,3)
+            tiledlayout(2,2)
             nexttile
             plot(dSample(1,:),dSample(2,:),viewChangesDisplayStyle)
             xlabel("\Delta{x}, m")
             ylabel("\Delta{y}, m")
             nexttile
-            plot(dSample(5,:),dSample(6,:),viewChangesDisplayStyle)
-            xlabel("\Delta{p_x}, GeV/c")
-            ylabel("\Delta{p_y}, GeV/c")
-            nexttile
             plot(dSample(1,:),dSample(5,:),viewChangesDisplayStyle)
             xlabel("\Delta{x}, m")
             ylabel("\Delta{p_x}, GeV/c")
+            nexttile
+            plot(dSample(5,:),dSample(6,:),viewChangesDisplayStyle)
+            xlabel("\Delta{p_x}, GeV/c")
+            ylabel("\Delta{p_y}, GeV/c")
             nexttile
             plot(dSample(2,:),dSample(6,:),viewChangesDisplayStyle)
             xlabel("\Delta{y}, m")
@@ -234,6 +235,10 @@ classdef MCResult
                 options.yGrid(1,:) double = []% m
                 options.MaxZPoints(1,:) double {mustBeInteger,mustBeScalarOrEmpty} = []
                 options.MaxThetaPoints(1,:) double {mustBeInteger,mustBeScalarOrEmpty} = []
+                options.kmeans(1,1) double {mustBeInteger} = 3;
+                options.ShieldSecondaries(1,1) logical = 0;
+                options.ShieldingMaterial(1,1) Material = "W"
+                options.ShieldingDepth(1,1) double {mustBePositive} = Consts.TungstenDepth;
                 options.echo(1,1) string {mustBeMember(options.echo,["on","off"])} = "on";
             end
             thetaPrimary = Consts.TubeRadius.*atan2(obj.projectedPrimaries(2,:),obj.projectedPrimaries(1,:));
@@ -250,7 +255,7 @@ classdef MCResult
             ylabel("Circumferential distance, R\theta")
             hold off
             ax = nexttile;
-            [Z,Y,E] = obj.energyDistribution("Material",options.MagnetMaterial,"zGrid",options.zGrid,"yGrid",options.yGrid,"MaxZPoints",options.MaxZPoints,"MaxThetaPoints",options.MaxThetaPoints,"echo",options.echo);
+            [Z,Y,E] = obj.energyDistribution("Material",options.MagnetMaterial,"zGrid",options.zGrid,"yGrid",options.yGrid,"MaxZPoints",options.MaxZPoints,"MaxThetaPoints",options.MaxThetaPoints,"echo",options.echo,"kmeans",options.kmeans,"ShieldSecondaries",options.ShieldSecondaries,"ShieldingMaterial",options.ShieldingMaterial,"ShieldingDepth",options.ShieldingDepth);
             % E is in J/m^3 - change to W/m^3 and then to mw/cm^3
             E = E.*options.scalefactor.*1e-3;
             surf(Z,Y,E)
@@ -259,6 +264,67 @@ classdef MCResult
             ylabel("Distance around circumference, m")
             zlabel("Volumetric energy deposition, mW {cm}^{-3}")
         end
+
+        function viewCSDARange(obj,material,options)
+            arguments(Input)
+                obj(1,1) MCResult
+                material(1,1) Material = "W"
+                options.dims(1,1) double {mustBeMember(options.dims,[2,3])} % number of plot axes
+                options.include(1,1) string {mustBeMember(options.include,["primaries","secondaries","all"])} = "all"
+                options.method(1,1) string {mustBeMember(options.method,["CSDA","True","Perpendicular"])} = "CSDA";
+            end
+            if options.method == "CSDA"
+                [delXPrimaries,delXSecondaries] = obj.getCSDARange("include",options.include);
+            else
+                [delXPrimaries,delXSecondaries] = obj.getRange("include",options.include);
+                if options.method=="Perpendicular"
+                    if options.include == "primaries"||options.include=="all"
+                        primaryDirections = sym(obj.projectedPrimaries(5:7,:));
+                        primarySines = double(sin(acos(primaryDirections(3,:)./sqrt(primaryDirections(3,:).^2+primaryDirections(2,:).^2+primaryDirections(1,:).^2))));
+                        delXPrimaries = delXPrimaries.*primarySines;
+                    end
+                    if options.include=="secondaries"||options.include=="all"
+                        secondaryDirections = sym(obj.projectedSecondaries(5:7,:));
+                        secondarySines = double(sin(acos(secondaryDirections(3,:)./sqrt(secondaryDirections(3,:).^2+secondaryDirections(2,:).^2+secondaryDirections(1,:).^2))));
+                        delXSecondaries = delXSecondaries.*secondarySines;
+                    end
+                end
+            end
+            
+            if isempty(delXPrimaries)&&isempty(delXSecondaries)
+                warning("No particles included")
+                return
+            end
+            % plot results
+            figure
+            tiledlayout(1,2)
+            nexttile
+            if ~isempty(delXPrimaries)
+                loglog(obj.projectedPrimaries(3,:),delXPrimaries,"m.");
+                hold on
+            end
+            loglog(obj.projectedSecondaries(3,:),delXSecondaries,"g.");
+            hold off
+            xlabel("Distance along beam axis z, m")
+            strLabel = sprintf("%s range in %s, m",options.method,material.name);
+            ylabel(strLabel);
+            if options.include == "all"
+                legend("Secondaries","Primaries");
+            end
+            nexttile
+            if ~isempty(delXPrimaries)
+                loglog(obj.projectedPrimaries(3,:),obj.projectedPrimaries(4,:),"m.");
+                hold on
+            end
+            loglog(obj.projectedSecondaries(3,:),obj.projectedSecondaries(4,:),"g.");
+            hold off
+            xlabel("Distance along beam axis z, m")
+            ylabel("Final particle energy, GeV")
+            if options.include =="all"
+                legend("Secondaries","Primaries");
+            end
+        end
+    
     end
 
     methods % public, data
@@ -270,7 +336,11 @@ classdef MCResult
                 options.yGrid(1,:) double =[] % m
                 options.MaxZPoints(1,:) double {mustBeInteger,mustBeScalarOrEmpty} = []
                 options.MaxThetaPoints(1,:) double {mustBeInteger,mustBeScalarOrEmpty} = []
+                options.ShieldSecondaries(1,1) logical = 0;
+                options.ShieldingMaterial(1,1) Material = "W"
+                options.ShieldingDepth(1,1) double {mustBePositive} = Consts.TungstenDepth
                 options.echo(1,1) string {mustBeMember(options.echo,["on","off"])} = "on";
+                options.kmeans(1,1) double {mustBeInteger} = 3
             end
             arguments(Output)
                 Z(:,:) double % grid, m
@@ -282,53 +352,136 @@ classdef MCResult
             if isempty(options.MaxThetaPoints)
                 options.MaxThetaPoints = options.MaxZPoints;
             end
+            if options.ShieldSecondaries
+                if options.echo
+                    fprintf("Calculating secondary ranges...")
+                end
+                % need to first filter out the secondaries without range
+                [~,secondaryRanges] = obj.getRange(options.ShieldingMaterial,"include","secondaries");
+                includeIdx = secondaryRanges>options.ShieldingDepth;
+                includedSecondaries = obj.projectedSecondaries(:,includeIdx);
+%                 includedSecondaries = obj.projectedSecondaries;
+                % now decrease their energy according to path length
+                shieldingMaterial = options.ShieldingMaterial;
+                includedSecondaries(4,:) = shieldingMaterial.energyChange(includedSecondaries(4,:)-includedSecondaries(9,:),includedSecondaries(9,:),includedSecondaries(8,:),secondaryRanges(includeIdx));
+                % alter the momentum magnitude according to new energy
+                includedSecondaries(5:7,:) = includedSecondaries(5:7,:).* sqrt((includedSecondaries(4,:).^2-includedSecondaries(9,:).^2)./(includedSecondaries(5,:).^2+includedSecondaries(6,:).^2+includedSecondaries(7,:).^2));
+                % save secondaries
+                projectedData = [obj.projectedPrimaries includedSecondaries];
+            else
+                projectedData = obj.projectedParticles;
+            end
 
-            % energy deposition of each particle
-            gamma = obj.projectedParticles(4,:)./obj.projectedParticles(9,:);
-            beta = sqrt(1-1./gamma.^2);
+            beta = sqrt(1-1./(projectedData(4,:)./projectedData(9,:)).^2);
             % energy deposition in GeV/m
-            dEdx = options.Material.dEdx(beta,obj.projectedParticles(9,:),obj.projectedParticles(8,:));
-            
-            % total energy deposition
-            totE = sum(dEdx);
-
+            dEdx = options.Material.dEdx(beta,projectedData(9,:),projectedData(8,:));
             % positions of samples on z-theta*R graph
-            z = obj.projectedParticles(3,:);
-            theta = sign(obj.projectedParticles(2,:)).*acos(obj.projectedParticles(1,:)./sqrt(obj.projectedParticles(1,:).^2+obj.projectedParticles(2,:).^2));
+            z = projectedData(3,:);
+            theta = sign(projectedData(2,:)).*acos(projectedData(1,:)./sqrt(projectedData(1,:).^2+projectedData(2,:).^2));
             y = theta*Consts.TubeRadius;
             % store zysamples on the GPU to speed it up for larger samples
-            zySamples = gpuArray([z;y])';
+            zySamples = [z;y]';
 
-            % grid initialisation
-            if isempty(options.zGrid)
-                zGrid = equiprobableGrid(z,options.MaxZPoints);
-            else
-                zGrid = options.zGrid;
-            end
             if isempty(options.yGrid)
                 yGrid = equiprobableGrid(y,options.MaxThetaPoints);
             else
                 yGrid = options.yGrid;
             end
-            [Z,Y] = meshgrid(zGrid,yGrid);
             if options.echo
                 % begin performance timer
-                fprintf("Performing kernel energy density estimation onto %d x %d grid\n",size(Z,1),size(Z,2));
+                fprintf("Performing kernel energy density estimation");
                 tic
             end
-            % KDE grid input (must be nx2), stored on GPU
-            zyGrid = gpuArray([Z(:) Y(:)]);
-            % KDE sample input is zySamples from before
+            % perform 3-mean clustering on log vals of z axis
+            logZ = log10(abs(z));
+            % TODO make k and optional parameter
+            k = options.kmeans;
+            if k==1
+                clusterIdx = ones(1,length(z));
+            else
+                clusterIdx = kmeans(logZ',k)';
+            end
 
-            % define weights for the kernel density estimation, GPU array
-            energyWeights = gpuArray(dEdx./totE);
-            % perform a weighted KDE calculation
-            [weightedPdf,~] = ksdensity(zySamples,zyGrid,'Weights',energyWeights,'Function','pdf');
-            % multiply pdf by total energy deposition to get energy
-            % deposition density stored on GPU
-            Egpu = reshape(weightedPdf.*totE,size(Z));
-            % energy deposition (main memory) in GeV/m^3
-            E = gather(Egpu);
+            % not necessary for results, but helps for visualisation:
+            % sort the indices so that the smallest mean is group 1 etc.
+            firstZpositions = zeros(1,k);
+            for i = 1:k
+                zK = z(clusterIdx==i);
+                firstZpositions(i) = zK(1);
+            end
+            % get sorting order
+            [~,clusterOrder] = sort(firstZpositions);
+            % sort the indices
+            unsortedIdx = clusterIdx;
+            for i = 1:k
+                clusterIdx(unsortedIdx==clusterOrder(i)) = i;
+            end
+
+            % make a grid for each cluster, splice together for final grid
+            nZGrid = 0;
+            nj = zeros(1,k);
+            for j = 1:k
+                nj(j) = length(z(clusterIdx==j));
+                if isempty(options.MaxZPoints)
+                    nZGrid = nZGrid + ceil(min(2*nj(j)^(2/5),nj(j)/5));
+                else
+                    nZGrid = nZGrid + min(ceil(min(2*nj(j)^(2/5),nj(j)/5)),options.MaxZPoints);
+                end
+            end
+            zGrid = zeros(1,nZGrid);
+
+            cellSamples = cell(1,k);
+            cellWeights = cell(1,k);
+            currIdx = 1;
+            for j = 1:k
+                zK = z(clusterIdx==j);
+                thisGrid = equiprobableGrid(zK,options.MaxZPoints);
+
+                zGrid(currIdx:currIdx+length(thisGrid)-1) = thisGrid;
+                currIdx = currIdx+length(thisGrid);
+
+                cellSamples(j) = {zySamples(clusterIdx==j,:)};
+                cellWeights(j) = {dEdx(clusterIdx==j)};
+            end
+            [Z,Y] = meshgrid(zGrid,yGrid);
+            zyGrid = gpuArray([Z(:),Y(:)]);
+            % perform kde on each cluster:
+            Ek = gpuArray(zeros(size(zyGrid,1),k));
+            parfor i = 1:k
+                % find total energy of the cluster
+                clusterdEdx = cellWeights{i};
+                clusterEnergy = sum(clusterdEdx);
+                % make weights from relative energy to cluster total
+                clusterWeights = gpuArray(clusterdEdx./clusterEnergy)';
+                % apply weighted kde to global grid
+                clusterSamples = gpuArray(cellSamples{i});
+                clusterPDF = ksdensity(clusterSamples,zyGrid,"weights",clusterWeights);
+                % get cluster's contribution to total energy on grid
+                Ek(:,i) = clusterEnergy*clusterPDF;
+            end
+
+            % now add the results of all 3 kde's together
+
+            Evec = sum(Ek,2);
+
+            % reshape the final result back to grid
+
+            E = gather(reshape(Evec,size(Z)));
+
+
+
+
+
+
+
+
+            %             % perform a weighted KDE calculation
+            %             weightedPdf = ksdensity(zySamples,zyGrid,'Weights',energyWeights);
+            %             % multiply pdf by total energy deposition to get energy
+            %             % deposition density stored on GPU
+            %             Egpu = reshape(weightedPdf.*totE,size(Z));
+            %             % energy deposition (main memory) in GeV/m^3
+            %             E = Egpu;
             % energy deposition in J/m^3
             E = E*1e9*Consts.e;
             if options.echo
@@ -373,8 +526,8 @@ classdef MCResult
             zGridPrim = equiprobableGrid(zPrim,options.MaxZPoints);
             zGridSec = equiprobableGrid(zSec,options.MaxZPoints);
             % keep yGrid the same for both primaries and secondaries
-            yGrid = equiprobableGrid(y,options.MaxThetaPoints);
-            
+            yGrid = equiprobableGrid(yPrim,options.MaxThetaPoints);
+
             [ZPrim,Y] = meshgrid(zGridPrim,yGrid);
             [ZSec,~] = meshgrid(zGridSec,yGrid);
             if options.echo
@@ -397,8 +550,169 @@ classdef MCResult
             PDF = [PDFSec PDFPrim];
             SV = PDF.*propPrimariesIntersecting.*protonFlux;
         end
+
+        function [primaryCSDA,secondaryCSDA] = getCSDARange(obj,material,options)
+            arguments(Input)
+                obj(1,1) MCResult
+                material(1,1) Material = "W"
+                options.include(1,1) string {mustBeMember(options.include,["primaries","secondaries","all"])} = "all"
+                
+            end
+            primaryCSDA = [];
+            secondaryCSDA = [];
+            f = @(ek,m,z) material.csdaRange(ek,m,z);
+            if options.include == "primaries" ||options.include=="all"
+                eKprimaries= obj.projectedPrimaries(4,:)-obj.projectedPrimaries(9,:);
+                massPrimaries = obj.projectedPrimaries(9,:);
+                chargePrimaries = obj.projectedPrimaries(8,:);
+                primaryCSDA = zeros(1,length(massPrimaries));
+                parfor i = 1:length(massPrimaries)
+                    primaryCSDA(i) = f(eKprimaries(i),massPrimaries(i),chargePrimaries(i));
+                end
+            end
+
+            if options.include == "secondaries"||options.include=="all"
+                eKsecondaries = obj.projectedSecondaries(4,:)-obj.projectedSecondaries(9,:);
+                massSecondaries = obj.projectedSecondaries(9,:);
+                chargeSecondaries = obj.projectedSecondaries(8,:);
+                secondaryCSDA = zeros(1,length(massSecondaries));
+                parfor i = 1:length(massSecondaries)
+                    secondaryCSDA(i) = f(eKsecondaries(i),massSecondaries(i),chargeSecondaries(i));
+                end
+            end
+        end
+
+        function E = maxEnergy(obj,options)
+            arguments(Input)
+                obj(1,1) MCResult
+                options.Material(1,1) Material = Consts.MagnetMaterial;
+                options.MaxZPoints(1,:) double {mustBeInteger,mustBeScalarOrEmpty} = []
+                options.MaxThetaPoints(1,:) double {mustBeInteger,mustBeScalarOrEmpty} = []
+                options.echo(1,1) string {mustBeMember(options.echo,["on","off"])} = "on";
+                options.kmeans(1,1) double {mustBeInteger} = 3
+            end
+            arguments(Output)
+                E(:,:) double % max, J/m^3
+            end
+            options.echo = ismember(options.echo,"on");
+            % input parsing
+            if isempty(options.MaxThetaPoints)
+                options.MaxThetaPoints = options.MaxZPoints;
+            end
+            projectedData = obj.projectedParticles;
+            beta = sqrt(1-1./(projectedData(4,:)./projectedData(9,:)).^2);
+            % energy deposition in GeV/m
+            dEdx = options.Material.dEdx(beta,projectedData(9,:),projectedData(8,:));
+            % positions of samples on z-theta*R graph
+            z = projectedData(3,:);
+            theta = sign(projectedData(2,:)).*acos(projectedData(1,:)./sqrt(projectedData(1,:).^2+projectedData(2,:).^2));
+            y = theta*Consts.TubeRadius;
+            % store zysamples on the GPU to speed it up for larger samples
+            zySamples = [z;y]';
+
+
+            yGrid = equiprobableGrid(y,options.MaxThetaPoints);
+
+            if options.echo
+                % begin performance timer
+                fprintf("Performing kernel energy density estimation\n");
+                tic
+            end
+            % perform 3-mean clustering on log vals of z axis
+            logZ = log10(abs(z));
+            % TODO make k and optional parameter
+            k = options.kmeans;
+            if k==1
+                clusterIdx = ones(1,length(z));
+            else
+                clusterIdx = kmeans(logZ',k)';
+            end
+
+            cellSamples = cell(1,k);
+            cellWeights = cell(1,k);
+            cellGrids = cell(1,k);
+            maximumIdxInCluster = zeros(1,k);
+            maximumValInCluster = zeros(1,k);
+            maximumCombinedEnergies = zeros(1,k);
+            for j = 1:k
+                thisZGrid = equiprobableGrid(z(clusterIdx==j),options.MaxZPoints);
+                cellSamples(j) = {zySamples(clusterIdx==j,:)};
+                cellWeights(j) = {dEdx(clusterIdx==j)};
+                [Zj,Yj] = meshgrid(thisZGrid,yGrid);
+                cellGrids(j) = {[Zj(:) Yj(:)]};
+            end
+            % perform kde on each cluster:
+            parfor i = 1:k
+                % find total energy of the cluster
+                clusterdEdx = cellWeights{i};
+                clusterEnergy = sum(clusterdEdx);
+                % make weights from relative energy to cluster total
+                clusterWeights = clusterdEdx./clusterEnergy';
+                % apply weighted kde to global grid
+
+                clusterPDF = clusterEnergy.*ksdensity(cellSamples{i},cellGrids{i},"weights",clusterWeights);
+                % get cluster's contribution to total energy on grid
+                [maxVal,I] = max(clusterPDF);
+                maximumValInCluster(i) = maxVal;
+                maximumIdxInCluster(i) = I;
+            end
+            if options.echo
+                tElapsed = toc;
+                seconds = rem(tElapsed,60);
+                minutes = (tElapsed-seconds)./60;
+                fprintf("Energy deposition calculated in %d min %.5f\n",minutes,seconds)
+            end
+
+            % evaluate and sum the kdes at each maximum
+            for i = 1:k
+                currTotal = 0;
+                currGrid = cellGrids{i};
+                maximumLocation = currGrid(maximumIdxInCluster(i),:);
+                for j = 1:k
+                    if i==j
+                        currTotal = currTotal + maximumValInCluster(i);
+                    else
+                        currTotal = currTotal + sum(cellWeights{j}).*ksdensity(cellSamples{j},maximumLocation,"Weights",cellWeights{j}./sum(cellWeights{j}));
+                    end
+                end
+                maximumCombinedEnergies(i) = currTotal;
+            end
+            E = max(maximumCombinedEnergies)*1e9*Consts.e;
+
+        end
+
+        function [primaryRange,secondaryRange] = getRange(obj,material,options)
+            arguments(Input)
+                obj(1,1) MCResult
+                material(1,1) Material = "W"
+                options.include(1,1) string {mustBeMember(options.include,["primaries","secondaries","all"])} = "all"
+            end
+            [primaryRange,secondaryRange] = obj.getCSDARange(material,include=options.include);
+            % mean angle follows rayleigh distribution with theta_0
+            Z = material.Z;
+            A = material.A;
+            wt = material.wt;
+            X0 = material.X0;
+            rho = material.rho;
+            primaryBeta = sqrt(1-1./(obj.projectedPrimaries(4,:)./obj.projectedPrimaries(9,:)).^2);
+            primaryMomentum = obj.projectedPrimaries(4,:).*primaryBeta;
+            primaryCharge = obj.projectedPrimaries(8,:);
+            parfor i = 1:length(primaryRange)
+                primaryTheta = sqrt(pi/2) * MCS.getTheta0(primaryMomentum(i),primaryBeta(i),primaryCharge(i),Z,A,X0,rho,wt,primaryRange(i));
+                primaryRange(i) = 2*primaryRange(i)./(1+1/cos(primaryTheta));
+            end
+
+            secondaryBeta = sqrt(1-1./(obj.projectedSecondaries(4,:)./obj.projectedSecondaries(9,:)).^2);
+            secondaryMomentum = obj.projectedSecondaries(4,:).*secondaryBeta;
+            secondaryCharge = obj.projectedSecondaries(8,:);
+            for i = 1:length(secondaryRange)
+                secondaryTheta = sym(sqrt(pi/2) * MCS.getTheta0(secondaryMomentum(i),secondaryBeta(i),secondaryCharge(i),Z,A,X0,rho,wt,secondaryRange(i)));
+                secondaryRange(i) = double(2*sym(secondaryRange(i))./(1+1/cos(secondaryTheta)));
+            end
+        end
     end
 end
+
 
 function tr = getTracks(history)
 nTracks = length(history);

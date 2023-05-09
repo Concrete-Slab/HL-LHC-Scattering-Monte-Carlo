@@ -7,21 +7,19 @@ classdef SimulationOptions < handle
     %   also add it to the produceSecondaries hidden list
 
     properties(Constant)
-%         allowedModels(1,4) string = ["MCS","Rutherford","Photoionisation","Bethe"]
-        softModels(1,:) string = ["MCS","Bethe"]
+        softModels(1,:) string = ["MCS","Bethe","Bremsstrahlung"]
         hardModels(1,:) string = ["Rutherford","Ionisation","Nuclear"]
         allowedModels(1,:) string = [SimulationOptions.softModels,SimulationOptions.hardModels]
     end
 
     properties(Hidden,Constant)
-%         allModels = ["MCS","Rutherford","Photoionisation","Bethe","DummyHardProcess","DummySoftProcess"]
-        hiddenModels(1,:) string = ["DummyHardProcess","DummySoftProcess","DummySecondaryProcess"]
         allSoft(1,:) string = [SimulationOptions.softModels,"DummySoftProcess"]
         allHard(1,:) string = [SimulationOptions.hardModels,"DummyHardProcess","DummySecondaryProcess"]
+        hiddenModels(1,:) string = SimulationOptions.allModels(~ismember(SimulationOptions.allModels,SimulationOptions.allowedModels))
         allModels(1,:) string = [SimulationOptions.allSoft,SimulationOptions.allHard];
         produceSecondaries(1,:) string = ["DummySecondaryProcess","Ionisation"]
         defaultMaximumSecondaries(1,1) double {mustBeNonnegative,mustBeInteger} = 100;
-        defaultPoissonPercentile(1,1) double {mustBeLessThan(defaultPoissonPercentile,1),mustBePositive} = 0.9995
+        defaultPoissonPercentile(1,1) double {mustBeLessThan(defaultPoissonPercentile,1),mustBePositive} = 0.999995
     end
 
     properties
@@ -64,7 +62,6 @@ classdef SimulationOptions < handle
             obj.maximumSecondaries = options.maximumSecondaries;
         end
     end
-
 
     methods % getters
         function inc = get.included(obj)
@@ -218,6 +215,8 @@ switch strp
         sp = DummySoftProcess;
     case "Bethe"
         sp = SoftBetheBloch(inp.material);
+    case "Bremsstrahlung"
+        sp = Bremsstrahlung(inp.material);
     otherwise
         warning("Couldnt find soft model %s, returning empty",strp)
         sp = SoftProcess.empty(1,0);
