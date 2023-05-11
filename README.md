@@ -1,2 +1,4 @@
 # HL-LHC-Scattering-Monte-Carlo
 A MATLAB suite for simulations of protons incident on a screen within the HL-LHC. Produces full particle tracks, secondary particles, and beam tube energy deposition information.
+
+To run a basic simulation, run the main.m file. The number of samples, beam sigma/offset and the screen geometry can be altered easily by changing values in the simulation setup. This script will automatically run most of the data visualisaiton methods once the simulation is complete. To avoid producing many figures and performing intensive data analysis, these lines can be commented out to suit your needs. The intormation from the simulation is stored in an instance of "MCResult". Available methods of obtaining the simulation data and visualising it can be found by typing "help MCResult" in the console, or viewing the code documentation.
