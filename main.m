@@ -1,8 +1,8 @@
-Consts.data.default
 % IMPORTANT - add subdirectories to MATLAB search path with below command
 addpath(genpath(pwd))
+Consts.data.default
 %% Define problem geometry
-nSamples = 1e2; % number of protons that will be simulated
+nSamples = 5e3; % number of protons that will be simulated
 
 % HL-LHC beam properties
 sigma = 220e-6; % beam rms width, metres
@@ -10,7 +10,7 @@ mu = 0.002; % distance between beam centre and tube centre, metres
 
 
 % screen geometry properties
-thickness = 1e-3; % thickness of screen, metres
+thickness = 1e-2; % thickness of screen, metres
 sideLength = 1e-2; % side lengths of square screen, metres
 
 
@@ -29,7 +29,7 @@ scaleFactor = expectedProtons/nSamples;
 
 % choose a material for the screen
 % supported string names for materials are given by Materials.allNames
-material = Material("LSOCe");
+material = Material("Cu");
 
 %% Prepare simulation objects
 % create an input object, generate samples
@@ -40,11 +40,11 @@ mcinput = MCInput(geometry,material,n=nSamples);
 % - choose whether to save intermediate positions of particles
 % - choose how many recursions can be done to simulate secondaries
 % Note that choosing recursionLimit=0 means no secondaries will be modelled
-simopts = SimulationOptions(exclude="all",threads=8,savesPositions=false,recursionLimit=2);
+simopts = SimulationOptions(exclude="all",threads=8,savesPositions=true,recursionLimit=2);
 
 % choose which physical processes to model
 % The list of supported models is given by SimulationOptions.allowedModels 
-simopts.include("Ionisation","Bremsstrahlung","Nuclear","Bethe","MCS","Rutherford")
+simopts.include("Ionisation","Nuclear","Bethe","MCS","Rutherford","Bremsstrahlung")
 %% Run simulation
 mcout = mcsimulate(mcinput,simopts);
 %% Inspect results
@@ -69,7 +69,7 @@ mcout.viewChanges
 % - MaxThetaPoints is set to 20 to save computation time at higher samples
 % - k means defines the # of regions for separate kernel density estimation
 % Note that the KDE is inaccurate for most sample sizes under 1e5
-mcout.viewIntersections("scalefactor",scaleFactor,"MaxThetaPoints",20,"kmeans",2);
+mcout.viewIntersections("scalefactor",scaleFactor,"MaxThetaPoints",20,"kmeans",3);
 
 % view the ranges of scattered particles in tungsten (W)
 % - secondary ranges are of most interest, save time by excluding primaries

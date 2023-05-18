@@ -77,6 +77,7 @@ while propagate
     for i = 1:nsoft
         dEdx = dEdx - soft(i).dEdx;
     end
+
     pRange = particle.energy./dEdx;
     alphaR = 0.2;
     finalRange = 1e-3;
@@ -119,8 +120,19 @@ while propagate
     else
         deltaX = maxStep;
     end
+    % error checking
     if deltaX<0
-        deltaX
+        guiltyIndex = find(isreal(M0) & real(M0)>0);
+
+        classesResponsible = repmat("",1,length(guiltyIndex));
+        strM0 = string(M0);
+        
+        for i = 1:length(guiltyIndex)
+            metadata = metaclass(hard(i));
+            classesResponsible(i) = metadata.Name;
+        end
+        str = sprintf("Error: nonpositive deltaX. inverse mfps are %s. Classes responsible for error are %s. Current proton has energy %.9f.",strM0.join(", "),classesResponsible.join(", "),particle.energy);
+        throw(MException("simulateOne:InvalidDeltaX",str))
     end
     
     
@@ -128,6 +140,8 @@ while propagate
     projectedPosition = ppos + deltaX*direction;
     if ~isreal(projectedPosition(2))
         ppos
+        deltaX
+        direction
     end
     % if delX is too large, then bring to edge, cease propagation and do
     % not apply a hard interaction, as the particle never reaches
@@ -210,6 +224,12 @@ while propagate
         
         % undergo hard interaction
         [dE,dAngleHard,newSecondaryInfo] = hp.interact;
+        if any(~isreal(dAngleHard))
+            strAngles = string(dAngleHard);
+            metadata = metaclass(hp);
+            str = sprintf("Error: bad hard angles. Angles vector is %s and the hard process is %s. The recursion depth is %d, the particle's kinetic energy is %.9f and the particle's energy is %.9f",strAngles.join(", "),metadata.Name,recursionDepth,particle.kineticEnergy,particle.energy)
+            throw(MException("simulateOne:BadHardAngles",""))
+        end
         % check if the particle is still moving enough
         if particle.kineticEnergy+dE<mke
             particle.momentum = 0;

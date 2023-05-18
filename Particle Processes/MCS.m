@@ -143,7 +143,7 @@ classdef MCS < SoftProcess
             
             rhoi = 0.001*rho*wt; % convert kg/m^3 to g/cm^3
             deltaX = 100*deltaX; % convert m to cm
-            X0 = 0.01*X0; % convert kg/m^2 to g/cm^2
+            X0 = 0.1*X0; % convert kg/m^2 to g/cm^2
             fit = Consts.data.mcsFit;
             p = particleMomentum*1000; % convert GeV/c to MeV/c;
             if fit == "Highland"
@@ -151,7 +151,9 @@ classdef MCS < SoftProcess
                 X = sum(rhoi)*(deltaX);
                 % apply highland correlation
                 theta0 = 13.6./(p*particleBeta)*sqrt(X./X0)*(1+0.088*log10(X./X0));
-
+                if ~isreal(theta0)
+                    theta0
+                end
             else
 
                 % path length in g/cm^2 for each component

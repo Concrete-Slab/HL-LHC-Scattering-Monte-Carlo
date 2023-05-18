@@ -78,12 +78,13 @@ classdef Material < handle
 
     methods
         function E = dEdx(obj,particleBeta,particleMass,particleCharge)
-            arguments
+            arguments(Input)
                 obj(1,1) Material
                 particleBeta(1,:) double = sqrt(1-1/(Consts.initialFourMomentum(1)/Consts.mpgev)^2) % v/c for incident particle
                 particleMass(1,:) double = Consts.mpgev % rest mass of incident particle in GeV/c^2, defaults to proton mass
                 particleCharge(1,:) double = 1;
             end
+            
             K = Consts.Kbb; % GeV kmol^-1 m^2
             gamma = 1./sqrt(1-particleBeta.^2);
             me = Consts.megev*1000; % GeV/c^2
@@ -128,6 +129,9 @@ classdef Material < handle
         end
     
         function delX = csdaRange(obj,particleKineticEnergy,particleMass,particleCharge)
+            arguments(Output)
+                delX(1,:) double {mustBeNonnegative}
+            end
             % determine limit of validity
             mke = Consts.MinimumKineticEnergy(particleMass,particleCharge);
 

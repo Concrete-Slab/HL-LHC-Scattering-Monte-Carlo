@@ -97,6 +97,13 @@ classdef Ionisation < HardProcess
 %                     T = sym(T-obj.I);
 %                 end
 %             end
+            % possibility that interact is invoked below tcut
+            if obj.particle.kineticEnergy<=obj.Tcut
+                dE = 0;
+                dAngles = [0;1;0;1];
+                secondaryParticle = double.empty(6,0);
+                return
+            end
             E = sym(obj.particle.energy); % GeV symbolic
             m = sym(obj.particle.mass); % GeV/c^2
             if obj.particle.mass == Consts.mpgev && obj.particle.charge == 1
