@@ -309,7 +309,7 @@ classdef MCResult
             strLabel = sprintf("%s range in %s, m",options.method,material.name);
             ylabel(strLabel);
             if options.include == "all"
-                legend("Secondaries","Primaries");
+                legend("Primaries","Secondaries");
             end
             nexttile
             if ~isempty(delXPrimaries)
@@ -321,7 +321,7 @@ classdef MCResult
             xlabel("Distance along beam axis z, m")
             ylabel("Final particle energy, GeV")
             if options.include =="all"
-                legend("Secondaries","Primaries");
+                legend("Primaries","Secondaries");
             end
         end
     
